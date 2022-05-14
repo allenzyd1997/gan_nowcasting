@@ -64,15 +64,18 @@ def to_img(x):
 #     transforms.ToTensor(),
 #     transforms.Normalize((0.5,), (0.5,))  # (x-mean) / std
 # ])
+
+# mean=[0.485, 0.456, 0.406]
+# std=[0.229, 0.224, 0.225]
+mean, std = [80.0], [0.0]
 img_transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.CenterCrop((256,256)),
-    # transforms.Normalize()  # (x-mean) / std
+    transforms.Normalize(mean, std)  # (x-mean) / std
 ])
-radar = TrainDataset(path = '/data1/yidanzhang/train/')
+radar_l = TrainDataset(path = '/data1/yidanzhang/train/', transforms=img_transform)
 
 dataloader = torch.utils.data.DataLoader(
-    dataset=radar, batch_size=BATCHSIZE, shuffle=False
+    dataset=radar_l, batch_size=BATCHSIZE, shuffle=False
 )
 
 
@@ -173,6 +176,7 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
             r_loss_sum += r_loss
         
         g_loss = td_loss_fake + td_loss_fake + r_loss_sum / fake_output.shape[0]
+        # g_loss = td_loss_fake + td_loss_fake 
 
         loss_gen_av.update(g_loss.item())
         
