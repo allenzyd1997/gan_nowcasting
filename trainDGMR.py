@@ -38,9 +38,12 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
+parser.add_argument('--num_epoch', default=3, type=int,
+                    help='the epoch num')
+parser.add_argument('--rec_iter', default=2500, type=int,
+                    help='for each --rec_iter num iterations record the result')
 args = parser.parse_args()
 dist.init_process_group(backend='nccl')
-
 torch.cuda.set_device(args.local_rank)
 
 
@@ -128,8 +131,9 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
 
     loss_gen_av = AverageMeter()
 
-    p_bar = tqdm(len(dataloader))
-    for i, img in enumerate(dataloader):
+    p_bar = tqdm(dataloader)
+
+    for i, img in enumerate(p_bar):
         img = img.cuda(non_blocking=True)
         img = torch.squeeze(img, -1)
         valid = Variable(Tensor(img.size(0)).fill_(1.0), requires_grad=False)
@@ -150,12 +154,14 @@ for epoch in range(num_epoch):  # 进行多个epoch的训练
         g_loss.backward()
         g_optimizer.step()
 
-        p_bar.set_description("Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}".format(
+        infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}".format(
                     epoch=epoch + 1,
                     epochs=num_epoch,
                     g_loss=loss_gen_av.avg,
-                    ) )
+                    )
+        p_bar.set_description(infor_per_iter)
         p_bar.update()
+    loss_gen_av.save(infor_per_iter, "./loss_result/")
     p_bar.close()
 print('....................................')
 
@@ -177,7 +183,7 @@ def test(model, dataloader):
         fake_output = model(fst_half, z)
         g_loss = criterion(scd_half,fake_output)
         loss_gen_av.update(g_loss.item())
-        p_bar.set_description("Train Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
+        p_bar.set_description("Test Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
                     iteration = i,
                     iterations= 600,
                     g_loss=loss_gen_av.avg,
