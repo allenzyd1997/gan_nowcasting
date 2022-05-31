@@ -185,6 +185,7 @@ def test(model, dataloader):
         p_bar.update()
     p_bar.close()
 
+
 test(G,test_dataloader )
 
 
