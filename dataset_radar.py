@@ -46,8 +46,6 @@ class TrainDataset(Dataset):
         return input_seq
 
 
-
-
 class TestDataset(Dataset):
     def __init__(self, path):
         super().__init__()

@@ -10,6 +10,7 @@ from torchvision import datasets
 from torchvision.utils import save_image
 import numpy as np
 import os
+import cv2
 import random
 from generator import generator
 from TemDiscriminator import TemDiscriminator
@@ -38,10 +39,12 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--num_epoch', default=3, type=int,
+parser.add_argument('--num_epoch', default=2, type=int,
                     help='the epoch num')
-parser.add_argument('--rec_iter', default=2500, type=int,
+parser.add_argument('--rec_iter', default=100, type=int,
                     help='for each --rec_iter num iterations record the result')
+parser.add_argument('--img_test_pth', default="./img/result_test", 
+                    help='the path for saving the img generated in the test phase')           
 args = parser.parse_args()
 dist.init_process_group(backend='nccl')
 torch.cuda.set_device(args.local_rank)
@@ -57,7 +60,7 @@ N=22
 H=256
 W=256
 Lambda=20
-num_epoch=3
+num_epoch=args.num_epoch
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 
@@ -126,44 +129,45 @@ g_optimizer = torch.optim.Adam(G.parameters(),betas=(0.0, 0.999), lr=0.00005)
     # TDis = TDis.to(device)
 
 # ##########################进入训练##判别器的判断过程#####################
-for epoch in range(num_epoch):  # 进行多个epoch的训练
-    print('第'+str(epoch)+'次迭代')
+def train():
+    for epoch in range(num_epoch):  # 进行多个epoch的训练
+        print('第'+str(epoch)+'次迭代')
 
-    loss_gen_av = AverageMeter()
+        loss_gen_av = AverageMeter()
 
-    p_bar = tqdm(dataloader)
+        p_bar = tqdm(dataloader)
 
-    for i, img in enumerate(p_bar):
-        img = img.cuda(non_blocking=True)
-        img = torch.squeeze(img, -1)
-        valid = Variable(Tensor(img.size(0)).fill_(1.0), requires_grad=False)
-        fake = Variable(Tensor(img.size(0)).fill_(0.0), requires_grad=False)
-        # init the valid and the fake matrix here 
-        real_imgs = Variable(img.type(Tensor))
+        for i, img in enumerate(p_bar):
+            img = img.cuda(non_blocking=True)
+            img = torch.squeeze(img, -1)
+            valid = Variable(Tensor(img.size(0)).fill_(1.0), requires_grad=False)
+            fake = Variable(Tensor(img.size(0)).fill_(0.0), requires_grad=False)
+            # init the valid and the fake matrix here 
+            real_imgs = Variable(img.type(Tensor))
 
-        fst_half = real_imgs[:, :M, : , : ]
-        scd_half = real_imgs[:, M:, : , : ]
+            fst_half = real_imgs[:, :M, : , : ]
+            scd_half = real_imgs[:, M:, : , : ]
 
-        z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
-        
-        fake_output = G(fst_half, z)
-        g_loss = criterion(scd_half,fake_output)
-        loss_gen_av.update(g_loss.item())
+            z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
+            
+            fake_output = G(fst_half, z)
+            g_loss = criterion(scd_half,fake_output)
+            loss_gen_av.update(g_loss.item())
 
-        g_optimizer.zero_grad()
-        g_loss.backward()
-        g_optimizer.step()
+            g_optimizer.zero_grad()
+            g_loss.backward()
+            g_optimizer.step()
 
-        infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}".format(
-                    epoch=epoch + 1,
-                    epochs=num_epoch,
-                    g_loss=loss_gen_av.avg,
-                    )
-        p_bar.set_description(infor_per_iter)
-        p_bar.update()
-    loss_gen_av.save(infor_per_iter, "./loss_result/")
-    p_bar.close()
-print('....................................')
+            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}".format(
+                        epoch=epoch + 1,
+                        epochs=num_epoch,
+                        g_loss=loss_gen_av.avg,
+                        )
+            p_bar.set_description(infor_per_iter)
+            p_bar.update()
+        loss_gen_av.save(infor_per_iter, "./loss_result/")
+        p_bar.close()
+    print('....................................')
 
 
 def test(model, dataloader):
@@ -183,6 +187,33 @@ def test(model, dataloader):
         fake_output = model(fst_half, z)
         g_loss = criterion(scd_half,fake_output)
         loss_gen_av.update(g_loss.item())
+
+        if i % args.rec_iter == 1:
+            pth = os.path.join(args.img_test_pth, str(i))
+            if not os.path.isdir(pth):
+                os.makedirs(pth)
+            # 只选择Batch中的第一套图片做存储
+            ri = real_imgs[0].cpu().detach().numpy()
+            fo = fake_output[0].cpu().detach().numpy()
+            
+            for idx, img_it in enumerate(ri):
+                # 还原图像
+                img_gt = np.uint8(img_it * 80)
+                mask = img_gt < 1.0
+                img_gt = 255 * mask + (1 - mask) * img_gt
+                # 存储图像
+                sv_pth = os.path.join(pth, "real_img_"+str(idx)+'.png')
+                cv2.imwrite(sv_pth, img_gt)
+            
+            for idx, img_it in enumerate(fo):
+                # 还原图像
+                img_gt = np.uint8(img_it * 80)
+                mask = img_gt < 1.0
+                img_gt = 255 * mask + (1 - mask) * img_gt
+                # 存储图像
+                sv_pth = os.path.join(pth,'fake_out_'+str(idx)+'.png')
+                cv2.imwrite(sv_pth, img_gt)
+
         p_bar.set_description("Test Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
                     iteration = i,
                     iterations= 600,
@@ -191,8 +222,9 @@ def test(model, dataloader):
         p_bar.update()
     p_bar.close()
 
-
-test(G,test_dataloader )
+# train() 
+G.load_state_dict(torch.load("generator.pth"))
+test(G,test_dataloader)
 
 
 
