@@ -39,9 +39,9 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--num_epoch', default=2, type=int,
+parser.add_argument('--num_epoch', default=1, type=int,
                     help='the epoch num')
-parser.add_argument('--rec_iter', default=100, type=int,
+parser.add_argument('--rec_iter', default=70, type=int,
                     help='for each --rec_iter num iterations record the result')
 parser.add_argument('--img_test_pth', default="./img/result_test", 
                     help='the path for saving the img generated in the test phase')           
@@ -54,7 +54,7 @@ cuda = True if torch.cuda.is_available() else False
 
 
 
-BATCHSIZE=4
+BATCHSIZE=12
 M=4
 N=22
 H=256
@@ -131,7 +131,12 @@ g_optimizer = torch.optim.Adam(G.parameters(),betas=(0.0, 0.999), lr=0.00005)
 # ##########################进入训练##判别器的判断过程#####################
 def train():
     for epoch in range(num_epoch):  # 进行多个epoch的训练
+
+
         print('第'+str(epoch)+'次迭代')
+
+        if epoch % 30 == 1 and epoch > 10:
+            torch.save(G.state_dict(), './' +str(epoch) +'_generator.pth') 
 
         loss_gen_av = AverageMeter()
 
@@ -222,8 +227,8 @@ def test(model, dataloader):
         p_bar.update()
     p_bar.close()
 
-# train() 
-G.load_state_dict(torch.load("generator.pth"))
+train() 
+# G.load_state_dict(torch.load("generator.pth"))
 test(G,test_dataloader)
 
 
