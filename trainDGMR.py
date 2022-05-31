@@ -54,7 +54,7 @@ N=22
 H=256
 W=256
 Lambda=20
-num_epoch=5
+num_epoch=3
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 
@@ -177,14 +177,14 @@ def test(model, dataloader):
         fake_output = model(fst_half, z)
         g_loss = criterion(scd_half,fake_output)
         loss_gen_av.update(g_loss.item())
-        p_bar.set_description("Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}".format(
-                    epoch=epoch + 1,
-                    epochs=num_epoch,
+        p_bar.set_description("Train Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
+                    iteration = i,
+                    iterations= 600,
                     g_loss=loss_gen_av.avg,
                     ) )
         p_bar.update()
     p_bar.close()
-    
+
 test(G,test_dataloader )
 
 
