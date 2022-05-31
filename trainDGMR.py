@@ -39,7 +39,7 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--num_epoch', default=1, type=int,
+parser.add_argument('--num_epoch', default=100, type=int,
                     help='the epoch num')
 parser.add_argument('--rec_iter', default=70, type=int,
                     help='for each --rec_iter num iterations record the result')
@@ -229,7 +229,7 @@ def test(model, dataloader):
 
 train() 
 # G.load_state_dict(torch.load("generator.pth"))
-test(G,test_dataloader)
+# test(G,test_dataloader)
 
 
 
