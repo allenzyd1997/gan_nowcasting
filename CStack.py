@@ -7,6 +7,7 @@ from DBlock import DBlockDown
 
 
 class conditioningStack(nn.Module):
+    # 输入的就是CDinput的四张图片
     def __init__(self, in_channels):
         super(conditioningStack, self).__init__()
         # self.s2d = space_to_depth()
@@ -22,9 +23,7 @@ class conditioningStack(nn.Module):
         self.conv3_4 = SpectralNorm(nn.Conv2d(768, 384, 3, stride=1, padding=1))  # 图像大小保持不变
 
     def forward(self, x):
-
         dataList=[]
-
         for i in range(x.shape[1]):
             x_new=x[:,i,:,:,:] 
             x_new=space_to_depth(x_new,2) 

@@ -70,7 +70,6 @@ class TestDataset(Dataset):
             img_path = os.path.join(image_file_path, images[i])
             img = Image.open(img_path)
             img = np.array(img)
-
             img = cv2.resize(img, (self.solution, self.solution),
                              interpolation=cv2.INTER_NEAREST).reshape(self.solution, self.solution, 1)
             mask = (img > 80)

@@ -1,6 +1,6 @@
 import torch.nn as nn
 from CStack import conditioningStack
-from convGRU import ConvGRU,ConvGRUCell
+from convGRU import ConvGRU
 from outputStack import outputStack
 from LCStack import LCStack
 import torch
@@ -20,37 +20,24 @@ class generator(nn.Module):
         self.outputStack=outputStack()
 
     def forward(self,CD_input,LCS_input):
-
-        # CD_input.shape
-        # torch.Size([1, 30, 256, 256])
-        # LCS_input.shape
-        # torch.Size([1, 8, 8, 8])
-
         CD_input=torch.unsqueeze(CD_input,2)
-
+        
         LCS_output = self.LCStack(LCS_input)
-
         CD_output = self.conditioningStack(CD_input)
-
-
         CD_output.reverse()  #list
-
         LCS_output=torch.unsqueeze(LCS_output,1)
-
         LCS_outputs=[LCS_output]*18
-
         for i in range(len(LCS_outputs)):
             if i==0:
                LCS_outputs_data=LCS_outputs[i]
             else:
                LCS_outputs_data = torch.cat((LCS_outputs_data , LCS_outputs[i]), 1)
-
         layer_output_list, last_state_list = self.ConvGRU(LCS_outputs_data, CD_output)
 
         RadarPreds = []
         data=layer_output_list[0]
         for i in range(data.shape[1]):
-            temp = data[:,i]
+            temp = data[:,i] # 纵向切割了矩阵
             out = self.outputStack(temp)
             RadarPreds.append(out)
 
@@ -63,10 +50,7 @@ class generator(nn.Module):
 
 if __name__ == "__main__":
         CD_input = torch.randn(8, 4, 256, 256)
-        LCS_input = torch.randn((8, 8, 8, 8))
+        li = torch.randn((8, 8, 8))
+        LCS_input = li.repeat(8,1,1,1)
         g = generator(24)
         RadarPreds=g(CD_input,LCS_input)
-
-
-
-

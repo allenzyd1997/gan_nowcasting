@@ -92,8 +92,8 @@ class ConvGRU(nn.Module):
 
         super().__init__()
 
-        self.input_size = input_dim
-        self.input_dim =input_dim
+        self.input_size     = input_dim
+        self.input_dim      = input_dim
 
         if type(hidden_dim) != list:
             self.hidden_sizes = [hidden_dim]*num_layers
@@ -112,10 +112,6 @@ class ConvGRU(nn.Module):
         squenceCells=nn.ModuleList()
 
         for i in range(self.n_layers):
-            if i == 0:
-                input_dim = self.input_size
-            else:
-                input_dim = self.hidden_sizes[i-1]
 
             cell = ConvGRUCell(self.input_dim[i], self.hidden_sizes[i], 3)
 
@@ -144,16 +140,15 @@ class ConvGRU(nn.Module):
         upd_hidden : 5D hidden representation. (layer, batch, channels, height, width).
         '''
 
-        input = x
-        output = []
-
+        input_tensor = x
 
         layer_output_list = []
         last_state_list = []
-        seq_len = input.size(1)
-        cur_layer_input = input
+        seq_len = input_tensor.size(1)
+        cur_layer_input = input_tensor
 
         for layer_idx in range(self.n_layers):
+
             output_inner=[]
             for t in range(seq_len):
                cell= self.cells[layer_idx]
@@ -161,10 +156,7 @@ class ConvGRU(nn.Module):
                squenceCell=self.squenceCells[layer_idx]
 
                # pass through layer
-
-               a=cur_layer_input[:, t, :, :, :]
-
-               upd_cell_hidden = cell(cur_layer_input[:, t, :, :, :], cell_hidden) # TODO comment
+               upd_cell_hidden = cell(cur_layer_input[:, t, :, :, :], cell_hidden) 
                upd_cell_hidden=squenceCell(upd_cell_hidden)
 
                output_inner.append(upd_cell_hidden)
@@ -177,7 +169,6 @@ class ConvGRU(nn.Module):
 
         layer_output_list = layer_output_list[-1:]
         last_state_list = last_state_list[-1:]
-
         return layer_output_list, last_state_list
 
 
@@ -218,6 +209,5 @@ if __name__ == "__main__":
 
     layer_output_list, last_state_list= model(x, hidden_state)
 
-    print(layer_output_list[-1].size(),layer_output_list[-2].size())
     print(last_state_list[-1].size())
 
