@@ -64,31 +64,14 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
     
-    def save(self, infor, path):
-        if not os.path.exists(path):
-            if not os.path.isdir(path):
-                file = open(path, "w")
-            else:
-                file = open(os.path.join(path, "result.csv"), 'w')
-        else:
-            if not os.path.isdir(path):
-                file = open(path, "a")
-            else:
-                file = open(os.path.join(path, "result.csv"), 'a')
-        file.write(str(infor) + "\n")
 
-        file.close()
 
 
 if __name__ == "__main__":
     a = AverageMeter()
     a.count = 1 
     a.avg = 0.235553
-    a.save("/home/zhangyidan/gan_nowcasting/abc.csv")
             
-
-
-
 
 
 

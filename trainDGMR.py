@@ -15,7 +15,7 @@ import random
 from generator import generator
 from TemDiscriminator import TemDiscriminator
 from SpaDiscriminator import SpaDiscriminator
-from utils import w,Norm_1_numpy,Norm_1_torch
+from utils import w,Norm_1_numpy,Norm_1_torch,save
 
 from avm import AverageMeter, accuracy
 
@@ -65,7 +65,7 @@ W=256
 Lambda=20
 num_epoch=args.num_epoch
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
+ 
 
 # 创建文件夹
 if not os.path.exists('./img'):
@@ -117,8 +117,10 @@ test_dataloader = torch.utils.data.DataLoader(
 SDis=SpaDiscriminator()
 TDis=TemDiscriminator()
 TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), find_unused_parameters=True, device_ids=[args.local_rank])
+# Parameters which did not receive grad for rank 2: batchnorm.bias, batchnorm.weight
 G = generator(N)
 G = torch.nn.parallel.DistributedDataParallel(G.cuda(), device_ids=[args.local_rank])
+
 RELU = nn.ReLU()
 
 # 首先需要定义loss的度量方式  （二分类的交叉熵）
@@ -163,8 +165,7 @@ def train(G):
         p_bar = tqdm(dataloader)
 
         for i, img in enumerate(p_bar):
-            if i > 20:
-                break
+
             # training in the iteration
             img = img.cuda(non_blocking=True)
             img = torch.squeeze(img, -1)
@@ -198,21 +199,21 @@ def train(G):
 
             td_real_loss = criterion(TDis(TD_input_real),valid)
             td_fake_loss = criterion(TDis(TD_input_fake), fake)
-            td_loss = (td_real_loss + td_fake_loss) / 2
+            td_loss = RELU(1-td_real_loss) + RELU(1+td_fake_loss)
             loss_tid_av.update(td_loss.item())
             td_loss.backward()
             TDis_optimizer.step()
 
-            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}".format(
+            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. Iteration: {iteration}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}".format(
                         epoch=epoch + 1,
                         epochs=num_epoch,
+                        iteration=i,
                         g_loss=loss_gen_av.avg,
                         td_loss = loss_tid_av.avg,
                         )
             p_bar.set_description(infor_per_iter)
             p_bar.update()
-
-            loss_gen_av.save(infor_per_iter, "./loss_result/")
+            save(infor_per_iter, "./loss_result/")
         p_bar.close()
         validation(G, val_dataloader)
     print('....................................')
@@ -235,13 +236,15 @@ def validation(model, dataloader):
 
         g_loss = criterion(scd_half,fake_output)
         loss_am.update(g_loss.item())
-        p_bar.set_description("VAL Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
+        infor_per_iter = "VAL Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
                     iteration = i,
                     iterations= len(dataloader),
                     g_loss=loss_am.avg,
-                ))
+                )
+        p_bar.set_description(infor_per_iter)
         p_bar.update()
     p_bar.close()
+    save(infor_per_iter, "./loss_result/")
     return loss_am
 
 def test(model, dataloader):
@@ -293,7 +296,7 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-G.load_state_dict(torch.load("./model_pth/2pu_hwloss.pth"))
+G.load_state_dict(torch.load("./model_pth/2gpu_hwLoss.pth"))
 train(G) 
 # test(G,test_dataloader)
 

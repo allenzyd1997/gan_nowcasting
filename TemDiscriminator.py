@@ -19,6 +19,10 @@ class TemDiscriminator(nn.Module):
         self.linear = nn.Linear(in_features=768 * 1 * 1, out_features=1)
         self.batchnorm = nn.BatchNorm1d(1)
         self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+        # change here by Yidan 
+        # 输出都是0.6931 最后一层应该用sigmoid 因为是BCEloss
+
 
     def forward(self,x):
         x = self.avgPool(x)
@@ -42,8 +46,10 @@ class TemDiscriminator(nn.Module):
           else:
            data=data+out
 
-        data=self.relu(data)
+        # data=self.relu(data)
+        data=self.sigmoid(data)
         data=torch.squeeze(data)
+
         return data
 
 
