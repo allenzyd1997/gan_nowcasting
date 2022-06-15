@@ -212,7 +212,7 @@ def train(G):
             p_bar.set_description(infor_per_iter)
             p_bar.update()
 
-        loss_gen_av.save(infor_per_iter, "./loss_result/")
+            loss_gen_av.save(infor_per_iter, "./loss_result/")
         p_bar.close()
         validation(G, val_dataloader)
     print('....................................')
@@ -293,7 +293,7 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-G.load_state_dict(torch.load("./model_pth/mse_trained_31epoch.pth"))
+G.load_state_dict(torch.load("./model_pth/2pu_hwloss.pth"))
 train(G) 
 # test(G,test_dataloader)
 

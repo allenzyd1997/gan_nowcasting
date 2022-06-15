@@ -1,5 +1,20 @@
 import numpy as np
 import torch
+import os
+
+def save(infor, path):
+    if not os.path.exists(path):
+        if not os.path.isdir(path):
+            file = open(path, "w")
+        else:
+            file = open(os.path.join(path, "result.csv"), 'w')
+    else:
+        if not os.path.isdir(path):
+            file = open(path, "a")
+        else:
+            file = open(os.path.join(path, "result.csv"), 'a')
+    file.write(str(infor) + "\n")
+    file.close()
 
 def depth_to_space(tensor, scale_factor):
     num, ch, height, width = tensor.shape
