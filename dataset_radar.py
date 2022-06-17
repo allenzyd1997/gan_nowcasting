@@ -74,7 +74,7 @@ class TestDataset(Dataset):
                              interpolation=cv2.INTER_NEAREST).reshape(self.solution, self.solution, 1)
             mask = (img > 80)
             img = ((1 - mask) * img + 0.0 * mask)*1.0
-            img = img / 80.0 * 100
+            img = img / 80.0 
             # if self.transforms:
                 #  img = self.transforms(img)
             inputs[i] = img.reshape(self.solution, self.solution, 1)

@@ -39,14 +39,16 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--num_epoch', default=5, type=int,
+parser.add_argument('--num_epoch', default=80, type=int,
                     help='the epoch num')
-parser.add_argument('--rec_iter', default=70, type=int,
+parser.add_argument('--rec_iter', default=36, type=int,
                     help='for each --rec_iter num iterations record the result')
 parser.add_argument('--img_test_pth', default="./img/result_test", 
                     help='the path for saving the img generated in the test phase')     
-parser.add_argument('--batch_size', default=8, type=int,
-                    help='for each --rec_iter num iterations record the result')           
+parser.add_argument('--batch_size', default=12, type=int,
+                    help='batch size ')           
+parser.add_argument('--interval', default=4, type=int,
+                    help='for each interval to use the gan training ')                      
 args = parser.parse_args()
 dist.init_process_group(backend='nccl')
 torch.cuda.set_device(args.local_rank)
@@ -117,6 +119,7 @@ test_dataloader = torch.utils.data.DataLoader(
 SDis=SpaDiscriminator()
 TDis=TemDiscriminator()
 TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), find_unused_parameters=True, device_ids=[args.local_rank])
+# TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), device_ids=[args.local_rank])
 # Parameters which did not receive grad for rank 2: batchnorm.bias, batchnorm.weight
 G = generator(N)
 G = torch.nn.parallel.DistributedDataParallel(G.cuda(), device_ids=[args.local_rank])
@@ -126,10 +129,12 @@ RELU = nn.ReLU()
 # 首先需要定义loss的度量方式  （二分类的交叉熵）
 # 其次定义 优化函数,优化函数的学习率为0.0003
 criterion = nn.BCEWithLogitsLoss()  # 是单目标二分类交叉熵函数
+mse = nn.MSELoss()
 # criterion = nn.MSELoss()
 SDis_optimizer = torch.optim.Adam(SDis.parameters(),betas=(0.0, 0.999), lr=0.0002)
 TDis_optimizer = torch.optim.Adam(TDis.parameters(),betas=(0.0, 0.999), lr=0.0002)
 g_optimizer = torch.optim.Adam(G.parameters(),betas=(0.0, 0.999), lr=0.00005)
+# g_optimizer = torch.optim.Adam(G.parameters(),betas=(0.0, 0.999), lr=0.00001)
 
 
 
@@ -154,6 +159,8 @@ def cal_loss(a,b):
 
 def train(G):
     for epoch in range(num_epoch):  # 进行多个epoch的训练
+        flag = epoch == 0 or (epoch > args.interval and epoch % args.interval == 1)
+        
         print('第'+str(epoch)+'次迭代')
 
         if epoch % 30 == 1 and epoch > 10:
@@ -163,9 +170,11 @@ def train(G):
         loss_tid_av = AverageMeter()
 
         p_bar = tqdm(dataloader)
+        # p_bar = tqdm(list(dataloader)[:36])
 
         for i, img in enumerate(p_bar):
-
+            # if i >= 36:
+                # break
             # training in the iteration
             img = img.cuda(non_blocking=True)
             img = torch.squeeze(img, -1)
@@ -180,29 +189,37 @@ def train(G):
             # ------------------
             # Train Generator
             # ------------------
+            
             g_optimizer.zero_grad()
             z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
             fake_output = G(fst_half, z)
             TD_input_fake = torch.cat((fst_half, fake_output), dim=1)
-            g_loss = criterion(TDis(TD_input_fake),valid)
-            # g_loss = cal_loss(scd_half,fake_output)
-            loss_gen_av.update(g_loss.item())
-            g_loss.backward()
+            if flag: 
+                # g_loss = cal_loss(scd_half,fake_output)
+                g_loss = criterion(TDis(TD_input_fake),valid)
+                loss_gen_av.update(g_loss.item())
+                g_loss.backward()
+            else:
+                loss_gen_av.update(g_loss.item())
+                g_loss = mse(scd_half, fake_output)
+                g_loss.backward()
+
             g_optimizer.step()
 
             # ------------------------
             # Train Time Discriminator
             # ------------------------
-            TDis_optimizer.zero_grad()
-            TD_input_real = torch.cat((fst_half, scd_half), dim=1)
-            TD_input_fake = torch.cat((fst_half, fake_output.detach()), dim=1)
+            if flag :
+                TDis_optimizer.zero_grad()
+                TD_input_real = torch.cat((fst_half, scd_half), dim=1)
+                TD_input_fake = torch.cat((fst_half, fake_output.detach()), dim=1)
 
-            td_real_loss = criterion(TDis(TD_input_real),valid)
-            td_fake_loss = criterion(TDis(TD_input_fake), fake)
-            td_loss = RELU(1-td_real_loss) + RELU(1+td_fake_loss)
-            loss_tid_av.update(td_loss.item())
-            td_loss.backward()
-            TDis_optimizer.step()
+                td_real_loss = criterion(TDis(TD_input_real),valid)
+                td_fake_loss = criterion(TDis(TD_input_fake), fake)
+                td_loss = RELU(1-td_real_loss) + RELU(1+td_fake_loss)
+                loss_tid_av.update(td_loss.item())
+                td_loss.backward()
+                TDis_optimizer.step()
 
             infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. Iteration: {iteration}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}".format(
                         epoch=epoch + 1,
@@ -213,7 +230,10 @@ def train(G):
                         )
             p_bar.set_description(infor_per_iter)
             p_bar.update()
+
+              
             save(infor_per_iter, "./loss_result/")
+
         p_bar.close()
         validation(G, val_dataloader)
     print('....................................')
@@ -296,7 +316,7 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-G.load_state_dict(torch.load("./model_pth/2gpu_hwLoss.pth"))
+# G.load_state_dict(torch.load("./model_pth/2gpu_hwLoss.pth"))
 train(G) 
 # test(G,test_dataloader)
 
