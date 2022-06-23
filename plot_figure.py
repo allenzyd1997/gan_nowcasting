@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-loss_file_pth = "./loss_result/test_result.csv"
+loss_file_pth = "./loss_result/result.csv"
 
 class loss_ploter():
     def __init__(self, path = loss_file_pth):
@@ -25,8 +25,8 @@ class loss_ploter():
                     iter_num  = int(line[1][line[1].find(':')+1 :])
                     gen_loss  = float(line[2][line[2].find(':')+1 : ])
                     td_loss   = float(line[3][line[3].find(':')+1 : -1])
-                    
                     self.add_dict(epoch_num, iter_num, self.gen_loss_dict, gen_loss)
+
                     self.add_dict(epoch_num, iter_num, self.td_loss_dict, td_loss)
 
         self.avg_dict(self.gen_loss_dict)
@@ -34,11 +34,10 @@ class loss_ploter():
         file.close()
 
     def add_dict(self, epoch_num, iter_num, dict, val):
+            # add value into the certain dict 
             if epoch_num not in dict.keys():
                 dict[epoch_num] = {}
-
             cd = dict[epoch_num] 
-
             if iter_num not in cd.keys():
                 cd[iter_num] = val
             else:
@@ -56,16 +55,25 @@ class loss_ploter():
             iters = list(dict[epoch].keys())
             liv   = dict[epoch][iters[-1]]
             data.append(liv)
+        print("{epochs} epochs data have been added".format(epochs = len(epochs)))
         return data 
 
-    def gen_iter(self, dict, interve = 1):
+    def gen_iter(self, dict, interve = 1, ep_terve= None):
         epochs = dict.keys()
-        data   = [] 
-        for epoch in epochs:
-            iters = dict[epoch].keys()
-            for idx, iter in enumerate(iters):
-                if idx % interve == 0:
-                    data.append(dict[epoch][iter])
+        data   = []
+        for idx, epoch in enumerate(epochs):
+            if ep_terve is None:
+                iters = dict[epoch].keys()
+                for idx, iter in enumerate(iters):
+                    if idx % interve == 0:
+                        data.append(dict[epoch][iter])
+            else:
+                if idx == 0 or idx % ep_terve == 1:
+                    iters = dict[epoch].keys()
+                    for idx, iter in enumerate(iters):
+                        if idx % interve == 0:
+                            data.append(dict[epoch][iter])
+        print("{epochs} epochs data have been added".format(epochs = len(epochs)))                
         return data
     
     def plot(self, data, path = './img/plot_figure/1.png'):
@@ -80,7 +88,7 @@ class loss_ploter():
 
 if __name__ == "__main__":
     ploter = loss_ploter(path= loss_file_pth)
-    data   = ploter.gen_iter(ploter.gen_loss_dict, interve = 1)
+    data   = ploter.gen_iter(ploter.gen_loss_dict, interve = 1, ep_terve=4)
     ploter.plot(data, './img/plot_figure/1.png')
 
 

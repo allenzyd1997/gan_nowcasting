@@ -39,7 +39,7 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--num_epoch', default=80, type=int,
+parser.add_argument('--num_epoch', default=7, type=int,
                     help='the epoch num')
 parser.add_argument('--rec_iter', default=36, type=int,
                     help='for each --rec_iter num iterations record the result')
@@ -113,7 +113,7 @@ val_dataloader = torch.utils.data.DataLoader(
 test_dataset = TestDataset(path = '/data1/shuliang/Radar_900/test/')
 test_sampler = torch.utils.data.distributed.DistributedSampler(test_dataset)
 test_dataloader = torch.utils.data.DataLoader(
-    dataset=test_dataset, batch_size=BATCHSIZE, shuffle=False, sampler=test_sampler
+    dataset=test_dataset, batch_size=VAL_BATCH, shuffle=False, sampler=test_sampler
 )
 
 SDis=SpaDiscriminator()
@@ -121,7 +121,9 @@ TDis=TemDiscriminator()
 TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), find_unused_parameters=True, device_ids=[args.local_rank])
 # TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), device_ids=[args.local_rank])
 # Parameters which did not receive grad for rank 2: batchnorm.bias, batchnorm.weight
+# G = generator(N)
 G = generator(N)
+
 G = torch.nn.parallel.DistributedDataParallel(G.cuda(), device_ids=[args.local_rank])
 
 RELU = nn.ReLU()
@@ -159,11 +161,11 @@ def cal_loss(a,b):
 
 def train(G):
     for epoch in range(num_epoch):  # 进行多个epoch的训练
-        flag = epoch == 0 or (epoch > args.interval and epoch % args.interval == 1)
-        
+        # flag = epoch == 0 or (epoch > args.interval and epoch % args.interval == 1)
+        flag = False
         print('第'+str(epoch)+'次迭代')
 
-        if epoch % 30 == 1 and epoch > 10:
+        if epoch % 2 == 1 and epoch > 1:
             torch.save(G.state_dict(), './' +str(epoch) +'_generator.pth') 
 
         loss_gen_av = AverageMeter()
@@ -171,7 +173,6 @@ def train(G):
 
         p_bar = tqdm(dataloader)
         # p_bar = tqdm(list(dataloader)[:36])
-
         for i, img in enumerate(p_bar):
             # if i >= 36:
                 # break
@@ -189,7 +190,8 @@ def train(G):
             # ------------------
             # Train Generator
             # ------------------
-            
+            # if i ==10:
+                # vvv = 0 
             g_optimizer.zero_grad()
             z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
             fake_output = G(fst_half, z)
@@ -200,8 +202,8 @@ def train(G):
                 loss_gen_av.update(g_loss.item())
                 g_loss.backward()
             else:
-                loss_gen_av.update(g_loss.item())
                 g_loss = mse(scd_half, fake_output)
+                loss_gen_av.update(g_loss.item())
                 g_loss.backward()
 
             g_optimizer.step()
@@ -279,7 +281,7 @@ def test(model, dataloader):
         fst_half = real_imgs[:, :M, : , : ]
         scd_half = real_imgs[:, M:, : , : ]
 
-        z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
+        z = Variable(Tensor(np.random.normal(0, 1, (VAL_BATCH ,8 ,8 ,8))))
         
         fake_output = model(fst_half, z)
 
@@ -316,7 +318,7 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-# G.load_state_dict(torch.load("./model_pth/2gpu_hwLoss.pth"))
+# G.load_state_dict(torch.load("./3_generator.pth"))
 train(G) 
 # test(G,test_dataloader)
 
