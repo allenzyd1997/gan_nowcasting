@@ -52,7 +52,7 @@ class ConvGRUCell(nn.Module):
         if prev_state is None:
 
             # get batch and spatial sizes
-            batch_size = x.data.size()[0]
+            ba7tch_size = x.data.size()[0]
             spatial_size = x.data.size()[2:]
 
             # generate empty prev_state, if None is provided

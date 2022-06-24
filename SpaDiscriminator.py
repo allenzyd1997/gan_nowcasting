@@ -49,7 +49,7 @@ class SpaDiscriminator(nn.Module):
           else:
            data=data+out
 
-        data=self.relu(data)
+        # data=self.relu(data)
         data = torch.squeeze(data)
         return data
 

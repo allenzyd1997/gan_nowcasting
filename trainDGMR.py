@@ -39,7 +39,7 @@ from torchvision import transforms
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--num_epoch', default=7, type=int,
+parser.add_argument('--num_epoch', default=50, type=int,
                     help='the epoch num')
 parser.add_argument('--rec_iter', default=36, type=int,
                     help='for each --rec_iter num iterations record the result')
@@ -85,7 +85,6 @@ def to_img(x):
 #     transforms.ToTensor(),
 #     transforms.Normalize((0.5,), (0.5,))  # (x-mean) / std
 # ])
-
 # mean=[0.485, 0.456, 0.406]
 # std=[0.229, 0.224, 0.225]
 mean, std = [80.0], [0.0]
@@ -118,10 +117,10 @@ test_dataloader = torch.utils.data.DataLoader(
 
 SDis=SpaDiscriminator()
 TDis=TemDiscriminator()
+SDis=torch.nn.parallel.DistributedDataParallel(SDis.cuda(), find_unused_parameters=True, device_ids=[args.local_rank])
 TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), find_unused_parameters=True, device_ids=[args.local_rank])
+
 # TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), device_ids=[args.local_rank])
-# Parameters which did not receive grad for rank 2: batchnorm.bias, batchnorm.weight
-# G = generator(N)
 G = generator(N)
 
 G = torch.nn.parallel.DistributedDataParallel(G.cuda(), device_ids=[args.local_rank])
@@ -161,18 +160,19 @@ def cal_loss(a,b):
 
 def train(G):
     for epoch in range(num_epoch):  # 进行多个epoch的训练
-        # flag = epoch == 0 or (epoch > args.interval and epoch % args.interval == 1)
-        flag = False
+        flag = epoch % args.interval == 0
+        # flag = False
         print('第'+str(epoch)+'次迭代')
 
-        if epoch % 2 == 1 and epoch > 1:
+        if epoch % 10 == 1 and epoch > 5:
             torch.save(G.state_dict(), './' +str(epoch) +'_generator.pth') 
 
         loss_gen_av = AverageMeter()
         loss_tid_av = AverageMeter()
+        loss_spd_av = AverageMeter()
+        loss_dis_av = AverageMeter()
 
         p_bar = tqdm(dataloader)
-        # p_bar = tqdm(list(dataloader)[:36])
         for i, img in enumerate(p_bar):
             # if i >= 36:
                 # break
@@ -209,7 +209,7 @@ def train(G):
             g_optimizer.step()
 
             # ------------------------
-            # Train Time Discriminator
+            # Train Discriminator
             # ------------------------
             if flag :
                 TDis_optimizer.zero_grad()
@@ -220,15 +220,34 @@ def train(G):
                 td_fake_loss = criterion(TDis(TD_input_fake), fake)
                 td_loss = RELU(1-td_real_loss) + RELU(1+td_fake_loss)
                 loss_tid_av.update(td_loss.item())
-                td_loss.backward()
+
+                
+                S = random.sample(range(0, N-M), 8)
+                S.sort()
+                SDis_optimizer.zero_grad()
+                SD_input_real = scd_half[:, S]
+                SD_input_fake = fake_output.detach()[:, S]
+
+                sd_real_loss = criterion(SDis(SD_input_real), valid)
+                sd_fake_loss = criterion(SDis(SD_input_fake), fake)
+                sd_loss = RELU(1-sd_real_loss) + RELU(1+sd_fake_loss)
+                loss_spd_av.update(sd_loss.item())
+
+                d_loss = td_loss + sd_loss 
+                d_loss.backward()
+                SDis_optimizer.step()
                 TDis_optimizer.step()
 
-            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. Iteration: {iteration}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}".format(
+                loss_dis_av.update(d_loss.item())
+
+            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. Iteration: {iteration}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}. SD_loss: {sd_loss:.4f}. D_loss: {d_loss:.4f}".format(
                         epoch=epoch + 1,
                         epochs=num_epoch,
                         iteration=i,
                         g_loss=loss_gen_av.avg,
                         td_loss = loss_tid_av.avg,
+                        sd_loss = loss_spd_av.avg,
+                        d_loss  = loss_dis_av.avg,
                         )
             p_bar.set_description(infor_per_iter)
             p_bar.update()
@@ -295,14 +314,6 @@ def test(model, dataloader):
             # 只选择Batch中的第一套图片做存储
             ri = real_imgs[0].cpu().detach().numpy()
             fo = fake_output[0].cpu().detach().numpy()
-            for idx, img_it in enumerate(fo):
-                # 还原图像
-                img_gt = np.uint8(img_it * 80)
-                mask = img_gt < 1
-                img_gt = 255 * mask + (1 - mask) * img_gt
-                # 存储图像
-                sv_pth = os.path.join(pth,'fake_out_'+str(idx)+'.png')
-                cv2.imwrite(sv_pth, img_gt)
             for idx, img_it in enumerate(ri):
                 # 还原图像
                 img_gt = np.uint8(img_it * 80)
@@ -310,7 +321,18 @@ def test(model, dataloader):
                 img_gt = 255 * mask + (1 - mask) * img_gt
                 # 存储图像
                 sv_pth = os.path.join(pth, "real_img_"+str(idx)+'.png')
+                
                 cv2.imwrite(sv_pth, img_gt)
+                break
+            for idx, img_it in enumerate(fo):
+                # 还原图像
+                img_gt = np.uint8(img_it * 80).reshape(256,256,1)
+                mask = img_gt < 20
+                img_gt = 255 * mask + (1 - mask) * img_gt
+                # 存储图像
+                sv_pth = os.path.join(pth,'fake_out_'+str(idx)+'.png')
+                cv2.imwrite(sv_pth, img_gt)
+
         p_bar.set_description("Test Epoch: {iteration}/{iterations:4}. gen_loss: {g_loss:.4f}".format(
                     iteration = i,
                     iterations= 600,
@@ -318,7 +340,7 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-# G.load_state_dict(torch.load("./3_generator.pth"))
+# G.load_state_dict(torch.load("./generator.pth"))
 train(G) 
 # test(G,test_dataloader)
 
