@@ -171,6 +171,7 @@ def train(G):
         loss_tid_av = AverageMeter()
         loss_spd_av = AverageMeter()
         loss_dis_av = AverageMeter()
+        loss_reg_av = AverageMeter()
 
         p_bar = tqdm(dataloader)
         for i, img in enumerate(p_bar):
@@ -195,12 +196,27 @@ def train(G):
             g_optimizer.zero_grad()
             z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
             fake_output = G(fst_half, z)
+
+            S = random.sample(range(0, N-M), 8)
+            S.sort()
+
             TD_input_fake = torch.cat((fst_half, fake_output), dim=1)
+            SD_input_fake = fake_output[:, S]
             if flag: 
-                # g_loss = cal_loss(scd_half,fake_output)
-                g_loss = criterion(TDis(TD_input_fake),valid)
+                r_loss_sum = 0 
+                for i in range(fake_output.shape[0]):
+                    result = torch.mul((fake_output[i] - scd_half[i]), scd_half[i])
+                    r_loss = (1 / H*W*N) * Lambda * Norm_1_torch(result)
+                    r_loss_sum += r_loss
+
+                r_loss_sum = r_loss_sum / fake_output.shape[0]
+
+                loss_reg_av.update(r_loss_sum)
+
+                g_loss = criterion(TDis(TD_input_fake),valid) + criterion(SDis(SD_input_fake),valid) + r_loss_sum
                 loss_gen_av.update(g_loss.item())
                 g_loss.backward()
+
             else:
                 g_loss = mse(scd_half, fake_output)
                 loss_gen_av.update(g_loss.item())
@@ -221,9 +237,6 @@ def train(G):
                 td_loss = RELU(1-td_real_loss) + RELU(1+td_fake_loss)
                 loss_tid_av.update(td_loss.item())
 
-                
-                S = random.sample(range(0, N-M), 8)
-                S.sort()
                 SDis_optimizer.zero_grad()
                 SD_input_real = scd_half[:, S]
                 SD_input_fake = fake_output.detach()[:, S]
@@ -240,7 +253,7 @@ def train(G):
 
                 loss_dis_av.update(d_loss.item())
 
-            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. Iteration: {iteration}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}. SD_loss: {sd_loss:.4f}. D_loss: {d_loss:.4f}".format(
+            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}. SD_loss: {sd_loss:.4f}. D_loss: {d_loss:.4f}. R_loss: {r_loss:.4f}.".format(
                         epoch=epoch + 1,
                         epochs=num_epoch,
                         iteration=i,
@@ -248,6 +261,7 @@ def train(G):
                         td_loss = loss_tid_av.avg,
                         sd_loss = loss_spd_av.avg,
                         d_loss  = loss_dis_av.avg,
+                        r_loss  = loss_reg_av.avg,
                         )
             p_bar.set_description(infor_per_iter)
             p_bar.update()
@@ -340,7 +354,7 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-# G.load_state_dict(torch.load("./generator.pth"))
+# G.load_state_dict(torch.load("./11_generator.pth"))
 train(G) 
 # test(G,test_dataloader)
 
