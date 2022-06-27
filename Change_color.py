@@ -3,8 +3,8 @@ import cv2
 import os
 import sys
 import time
-path='25000'
-newpath='results_color'
+path='./img/result_test/'
+newpath='./img/results_color/'
 if not os.path.exists(newpath):
     os.mkdir(newpath)
 files=os.listdir(path)

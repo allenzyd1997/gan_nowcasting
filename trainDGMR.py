@@ -1,6 +1,7 @@
 
 # coding=utf-8
 import argparse
+from traceback import print_tb
 import torch.distributed as dist
 import torch.autograd
 import torch.nn as nn
@@ -48,12 +49,13 @@ parser.add_argument('--img_test_pth', default="./img/result_test",
 parser.add_argument('--batch_size', default=12, type=int,
                     help='batch size ')           
 parser.add_argument('--interval', default=4, type=int,
-                    help='for each interval to use the gan training ')                      
+                    help='for each interval to use the gan training ')    
+parser.add_argument('--exp_name', default="")                                        
 args = parser.parse_args()
 dist.init_process_group(backend='nccl')
 torch.cuda.set_device(args.local_rank)
 
-
+print("EXP " + args.exp_name + " is Begining")
 cuda = True if torch.cuda.is_available() else False
 
 
@@ -123,7 +125,8 @@ TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), find_unused_paramete
 # TDis=torch.nn.parallel.DistributedDataParallel(TDis.cuda(), device_ids=[args.local_rank])
 G = generator(N)
 
-G = torch.nn.parallel.DistributedDataParallel(G.cuda(), device_ids=[args.local_rank])
+
+G = torch.nn.parallel.DistributedDataParallel(G.cuda(),find_unused_parameters=True, device_ids=[args.local_rank])
 
 RELU = nn.ReLU()
 
@@ -160,12 +163,15 @@ def cal_loss(a,b):
 
 def train(G):
     for epoch in range(num_epoch):  # 进行多个epoch的训练
-        flag = epoch % args.interval == 0
+        # flag = epoch % args.interval == 0
+        flag = True
         # flag = False
         print('第'+str(epoch)+'次迭代')
 
         if epoch % 10 == 1 and epoch > 5:
-            torch.save(G.state_dict(), './' +str(epoch) +'_generator.pth') 
+            torch.save(G.state_dict(), './' +str(epoch) + args.exp_name +'_generator.pth') 
+            torch.save(TDis.state_dict(), args.exp_name +'./SpaDiscriminatoring.pth') 
+            torch.save(SDis.state_dict(), args.exp_name +'./TemDiscriminatoring.pth') 
 
         loss_gen_av = AverageMeter()
         loss_tid_av = AverageMeter()
@@ -204,8 +210,8 @@ def train(G):
             SD_input_fake = fake_output[:, S]
             if flag: 
                 r_loss_sum = 0 
-                for i in range(fake_output.shape[0]):
-                    result = torch.mul((fake_output[i] - scd_half[i]), scd_half[i])
+                for j in range(fake_output.shape[0]):
+                    result = torch.mul((fake_output[j] - scd_half[j]), scd_half[j])
                     r_loss = (1 / H*W*N) * Lambda * Norm_1_torch(result)
                     r_loss_sum += r_loss
 
@@ -253,7 +259,7 @@ def train(G):
 
                 loss_dis_av.update(d_loss.item())
 
-            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}. SD_loss: {sd_loss:.4f}. D_loss: {d_loss:.4f}. R_loss: {r_loss:.4f}.".format(
+            infor_per_iter = "Train Epoch: {epoch}/{epochs:4}. Iteration: {iteration:4} gen_loss: {g_loss:.4f}. TD_loss: {td_loss:.4f}. SD_loss: {sd_loss:.4f}. D_loss: {d_loss:.4f}. R_loss: {r_loss:.4f}.".format(
                         epoch=epoch + 1,
                         epochs=num_epoch,
                         iteration=i,
@@ -267,7 +273,7 @@ def train(G):
             p_bar.update()
 
               
-            save(infor_per_iter, "./loss_result/")
+            save(infor_per_iter, args.exp_name,"./loss_result/")
 
         p_bar.close()
         validation(G, val_dataloader)
@@ -299,7 +305,7 @@ def validation(model, dataloader):
         p_bar.set_description(infor_per_iter)
         p_bar.update()
     p_bar.close()
-    save(infor_per_iter, "./loss_result/")
+    save(infor_per_iter,args.exp_name, "./loss_result/")
     return loss_am
 
 def test(model, dataloader):
@@ -341,7 +347,7 @@ def test(model, dataloader):
             for idx, img_it in enumerate(fo):
                 # 还原图像
                 img_gt = np.uint8(img_it * 80).reshape(256,256,1)
-                mask = img_gt < 20
+                mask = img_gt < 22
                 img_gt = 255 * mask + (1 - mask) * img_gt
                 # 存储图像
                 sv_pth = os.path.join(pth,'fake_out_'+str(idx)+'.png')
@@ -354,13 +360,13 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-# G.load_state_dict(torch.load("./11_generator.pth"))
+# G.load_state_dict(torch.load("./model_pth/dgmr_total_50.pth"))
 train(G) 
 # test(G,test_dataloader)
 
 
 
 # 保存模型
-torch.save(G.state_dict(), './generator.pth')  
-torch.save(SDis.state_dict(), './SpaDiscriminator.pth')
-torch.save(TDis.state_dict(), './TemDiscriminator.pth')
+torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
+torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
+torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')

@@ -2,17 +2,17 @@ import numpy as np
 import torch
 import os
 
-def save(infor, path):
+def save(infor, expname, path):
     if not os.path.exists(path):
         if not os.path.isdir(path):
             file = open(path, "w")
         else:
-            file = open(os.path.join(path, "result.csv"), 'w')
+            file = open(os.path.join(path, expname + "result.csv"), 'w')
     else:
         if not os.path.isdir(path):
             file = open(path, "a")
         else:
-            file = open(os.path.join(path, "result.csv"), 'a')
+            file = open(os.path.join(path, expname +"result.csv"), 'a')
     file.write(str(infor) + "\n")
     file.close()
 
@@ -82,6 +82,4 @@ def Norm_1(y):
     return sum/y.shape[0]
 
 if __name__ == "__main__":
-    a=np.random.randint(12,30,(4,5,5))
-    print(a,'a')
-    print(w(a),'w(a)')
+    save("12345", "test", './loss_result')

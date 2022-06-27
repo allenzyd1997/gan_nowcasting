@@ -12,8 +12,8 @@ class generator(nn.Module):
     def __init__(self,input_channel):
         super(generator, self).__init__()
         self.conditioningStack=conditioningStack(input_channel)
-        self.LCStack=LCStack()
-
+        self.LCStack=LCStack(attention=True)
+        # add the attention block in the LCS Stack by Yidan
         self.convGRU1 =  ConvGRU(input_shape=(8, 8), input_dim=768, hidden_dims=[384], kernel_size=3)
         self.convGRU2 =  ConvGRU(input_shape=(16, 16), input_dim=384, hidden_dims=[192], kernel_size=3)
         self.convGRU3 =  ConvGRU(input_shape=(32, 32), input_dim=192, hidden_dims=[96], kernel_size=3)
