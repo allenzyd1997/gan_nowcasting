@@ -163,8 +163,8 @@ def cal_loss(a,b):
 
 def train(G):
     for epoch in range(num_epoch):  # 进行多个epoch的训练
-        # flag = epoch % args.interval == 0
-        flag = True
+        flag = epoch % args.interval == 0
+        # flag = True
         # flag = False
         print('第'+str(epoch)+'次迭代')
 
@@ -366,7 +366,7 @@ train(G)
 
 
 
-# 保存模型
-torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
-torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
-torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')
+# # 保存模型
+# torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
+# torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
+# torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')
