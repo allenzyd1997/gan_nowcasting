@@ -170,8 +170,8 @@ def train(G):
 
         if epoch % 10 == 1 and epoch > 5:
             torch.save(G.state_dict(), './' +str(epoch) + args.exp_name +'_generator.pth') 
-            torch.save(TDis.state_dict(), args.exp_name +'./SpaDiscriminatoring.pth') 
-            torch.save(SDis.state_dict(), args.exp_name +'./TemDiscriminatoring.pth') 
+            torch.save(TDis.state_dict(), './'+args.exp_name +'_SpaDiscriminatoring.pth') 
+            torch.save(SDis.state_dict(), './'+args.exp_name +'_TemDiscriminatoring.pth') 
 
         loss_gen_av = AverageMeter()
         loss_tid_av = AverageMeter()
@@ -200,8 +200,11 @@ def train(G):
             # if i ==10:
                 # vvv = 0 
             g_optimizer.zero_grad()
-            z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
-            fake_output = G(fst_half, z)
+            # z = Variable(Tensor(np.random.normal(0, 1, (BATCHSIZE ,8 ,8 ,8))))
+            z = Variable(Tensor(np.random.normal(0, 1, (6, BATCHSIZE ,8 ,8 ,8))))
+            # add the avg of z here 
+            # and will change the G file to get the avg of 6 z
+            fake_output = G(fst_half, z,val=False)
 
             S = random.sample(range(0, N-M), 8)
             S.sort()
@@ -293,7 +296,7 @@ def validation(model, dataloader):
         scd_half = real_imgs[:, M:, : , : ]
         z = Variable(Tensor(np.random.normal(0, 1, (VAL_BATCH ,8 ,8 ,8))))
         
-        fake_output = model(fst_half, z)
+        fake_output = model(fst_half, z,val =True)
 
         g_loss = criterion(scd_half,fake_output)
         loss_am.update(g_loss.item())
@@ -367,6 +370,6 @@ train(G)
 
 
 # # 保存模型
-# torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
-# torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
-# torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')
+torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
+torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
+torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')
