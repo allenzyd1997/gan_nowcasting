@@ -204,7 +204,7 @@ def train(G):
             z = Variable(Tensor(np.random.normal(0, 1, (6, BATCHSIZE ,8 ,8 ,8))))
             # add the avg of z here 
             # and will change the G file to get the avg of 6 z
-            fake_output = G(fst_half, z,val=False)
+            fake_output = G(fst_half, z,val=True)
 
             S = random.sample(range(0, N-M), 8)
             S.sort()
@@ -325,7 +325,7 @@ def test(model, dataloader):
 
         z = Variable(Tensor(np.random.normal(0, 1, (VAL_BATCH ,8 ,8 ,8))))
         
-        fake_output = model(fst_half, z)
+        fake_output = model(fst_half, z,val=True)
 
         g_loss = criterion(scd_half,fake_output)
         loss_gen_av.update(g_loss.item())
@@ -363,13 +363,13 @@ def test(model, dataloader):
                     ) )
         p_bar.update()
     p_bar.close()
-# G.load_state_dict(torch.load("./model_pth/dgmr_total_50.pth"))
-train(G) 
-# test(G,test_dataloader)
+G.load_state_dict(torch.load("./model_pth/41att_int4_generator.pth"))
+# train(G) 
+test(G,test_dataloader)
 
 
 
 # # 保存模型
-torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
-torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
-torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')
+# torch.save(G.state_dict(), './' + args.exp_name+ 'generator.pth')  
+# torch.save(SDis.state_dict(), './ ' + args.exp_name+ 'SpaDiscriminator.pth')
+# torch.save(TDis.state_dict(), './'+args.exp_name+'TemDiscriminator.pth')
