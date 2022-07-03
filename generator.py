@@ -9,10 +9,12 @@ from GBlock import GBlockUp,GBlock
 from torch.nn.utils import spectral_norm
 
 class generator(nn.Module):
-    def __init__(self,input_channel):
+    def __init__(self, args):
+        
         super(generator, self).__init__()
-        self.conditioningStack=conditioningStack(input_channel)
-        self.LCStack=LCStack(attention=True)
+        self.conditioningStack=conditioningStack(args.N)
+        self.out_len = args.N - args.M
+        self.LCStack=LCStack(args.attention)
         # add the attention block in the LCS Stack by Yidan
         self.convGRU1 =  ConvGRU(input_shape=(8, 8), input_dim=768, hidden_dims=[384], kernel_size=3)
         self.convGRU2 =  ConvGRU(input_shape=(16, 16), input_dim=384, hidden_dims=[192], kernel_size=3)
@@ -38,7 +40,8 @@ class generator(nn.Module):
         self.outputStack = outputStack()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self,CD_input,LCS_input,val=False):
+    def forward(self,CD_input,LCS_input):
+
         CD_input=torch.unsqueeze(CD_input,2)
        
         CD_output = self.conditioningStack(CD_input)
@@ -48,41 +51,13 @@ class generator(nn.Module):
         self.convGRU3.setHidden(CD_output[1])
         self.convGRU4.setHidden(CD_output[0])
 
-        if not val:
-            for itr in range(6):
-                LCS_output = self.LCStack(LCS_input[itr])
+        z_dim = LCS_input.shape[0]
 
-                output=[]
-                for i in range(18):
-                    x=self.conv1(self.convGRU1(LCS_output))
-                    x=self.GBlock1(x)
-                    x=self.GBlockUp1(x)
-
-                    x=self.conv2(self.convGRU2(x))
-                    x=self.GBlock2(x)
-                    x=self.GBlockUp2(x)
-
-                    x=self.conv3(self.convGRU3(x))
-                    x=self.GBlock3(x)
-                    x=self.GBlockUp3(x)
-
-                    x=self.conv4(self.convGRU4(x))
-                    x=self.GBlock4(x)
-                    x=self.GBlockUp4(x)
-
-                    final_result=self.outputStack(x)
-                    output.append(final_result)
-                gen_images=self.sigmoid(torch.cat(output,1))
-                if itr ==0:
-                    gen_sequences=gen_images
-                else:
-                    gen_sequences = gen_sequences +  gen_images
-            return gen_sequences / 6.0
-        else:
-            LCS_output = self.LCStack(LCS_input)
+        for itr in range(z_dim):
+            LCS_output = self.LCStack(LCS_input[itr])
 
             output=[]
-            for i in range(18):
+            for _ in range(self.out_len):
                 x=self.conv1(self.convGRU1(LCS_output))
                 x=self.GBlock1(x)
                 x=self.GBlockUp1(x)
@@ -102,8 +77,11 @@ class generator(nn.Module):
                 final_result=self.outputStack(x)
                 output.append(final_result)
             gen_images=self.sigmoid(torch.cat(output,1))
-            return gen_images
-            
+            if itr ==0:
+                gen_sequences=gen_images
+            else:
+                gen_sequences = gen_sequences +  gen_images
+        return gen_sequences / z_dim
 
 if __name__ == "__main__":
         CD_input = torch.randn(8, 4, 256, 256)
