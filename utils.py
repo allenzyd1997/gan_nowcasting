@@ -7,12 +7,12 @@ def save(infor, expname, path):
         if not os.path.isdir(path):
             file = open(path, "w")
         else:
-            file = open(os.path.join(path, expname + "result.csv"), 'w')
+            file = open(os.path.join(path, expname + "_rst.csv"), 'w')
     else:
         if not os.path.isdir(path):
             file = open(path, "a")
         else:
-            file = open(os.path.join(path, expname +"result.csv"), 'a')
+            file = open(os.path.join(path, expname +"_rst.csv"), 'a')
     file.write(str(infor) + "\n")
     file.close()
 
@@ -81,5 +81,13 @@ def Norm_1(y):
       sum=sum+np.linalg.norm(y[i], ord=1, keepdims=True)
     return sum/y.shape[0]
 
+
+def cal_loss(a,b):
+    a_length = a.size(1)
+    loss = 0.0
+    for ei in range(a_length):
+        loss += torch.sum(((a[:, ei, :, :] - b[:, ei, :, :]) ** 2)) + \
+                torch.sum((torch.abs(a[:, ei, :, :] - b[:, ei, :, :])))
+    return loss / a_length
 if __name__ == "__main__":
     save("12345", "test", './loss_result')

@@ -11,16 +11,44 @@
             "request": "launch",
             // python -m torch.distributed.launch --nproc_per_node 2  main.py
             // 原命令是 -m 。。 所以相当于是启动torch.distributed.launch这个程序 main.py则变成了一个参数
-            "program": "/home/zhangyidan/anaconda3/envs/gan_nc/lib/python3.7/site-packages/torch/distributed/launch.py",
+            "program": "./main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [ 
-                    "--nproc_per_node=4",
-                    "trainDGMR.py"
+                    "--attention",
+                    "--exp_name=test"
                     ],
-            "env": {
-                "CUDA_VISIBLE_DEVICES":"4,5,6,7"
-            }
+            // "env": {
+            //     "CUDA_VISIBLE_DEVICES":"4,5,6,7"
+            // }
         }
     ]
 }
+
+
+// {
+//     // Use IntelliSense to learn about possible attributes.
+//     // Hover to view descriptions of existing attributes.
+//     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python: Current File",
+//             "type": "python",
+//             "python": "/home/zhangyidan/anaconda3/envs/gan_nc/bin/python",
+//             "request": "launch",
+//             // python -m torch.distributed.launch --nproc_per_node 2  main.py
+//             // 原命令是 -m 。。 所以相当于是启动torch.distributed.launch这个程序 main.py则变成了一个参数
+//             "program": "/home/zhangyidan/anaconda3/envs/gan_nc/lib/python3.7/site-packages/torch/distributed/launch.py",
+//             "console": "integratedTerminal",
+//             "justMyCode": true,
+//             "args": [ 
+//                     "--nproc_per_node=4",
+//                     "trainDGMR.py"
+//                     ],
+//             "env": {
+//                 "CUDA_VISIBLE_DEVICES":"4,5,6,7"
+//             }
+//         }
+//     ]
+// }

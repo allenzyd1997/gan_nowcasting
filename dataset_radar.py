@@ -50,6 +50,9 @@ class TestDataset(Dataset):
     def __init__(self, path):
         super().__init__()
         self.files = os.listdir(path)
+
+        self.files = [ '201806683','2018071636']
+
         self.file_number = len(self.files)
         self.path = path
         self.in_len = 4
@@ -80,4 +83,4 @@ class TestDataset(Dataset):
             inputs[i] = img.reshape(self.solution, self.solution, 1)
 
         input_seq = inputs[0:self.in_len + self.out_len, :, :, :]
-        return input_seq
+        return input_seq, image_file_path 
