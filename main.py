@@ -28,7 +28,7 @@ from torch import Tensor
 from torchvision import datasets
 from torchvision import transforms 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 parser = argparse.ArgumentParser()
 
 ################## CONFIG PARAMETER ###################
